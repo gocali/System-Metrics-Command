@@ -1,51 +1,51 @@
-# SysCommand (Tek Klasör)
+# SysCommand (Single Folder)
 
-## Çalıştırma
+## Running
 
 ```bash
 cd syscommand
 ./start.sh
 ```
 
-- Reverse Proxy: [http://127.0.0.1:8080](http://127.0.0.1:8080) (Frontend buradan servis edilir)
+- Reverse Proxy: [http://127.0.0.1:8080](http://127.0.0.1:8080) (Frontend is served here)
 - Backend API: [http://127.0.0.1:2025/api/healthz](http://127.0.0.1:2025/api/healthz)
 - MQTT (TCP): 127.0.0.1:1657 | WS: ws://127.0.0.1:1453/mqtt
 - Redis: 127.0.0.1:1999
 
-> Not: Docker izni yoksa bir kez: `sudo usermod -aG docker $USER && newgrp docker`
+> Note: If you don't have Docker permission, run once: `sudo usermod -aG docker $USER && newgrp docker`
 
-## WSL ile Çalıştırma
+## Running with WSL
 
-İki yol vardır:
+There are two ways:
 
-1. Docker Desktop + WSL Entegrasyonu (Önerilir):
+1. Docker Desktop + WSL Integration (Recommended):
 
-- Docker Desktop Settings → General: "Use the WSL 2 based engine" açık.
-- Settings → Resources → WSL Integration: Ubuntu dağıtımı Enabled.
-- WSL terminalinde projeye gidip `./start.sh` çalıştırın.
+- Docker Desktop Settings → General: "Use the WSL 2 based engine" enabled.
+- Settings → Resources → WSL Integration: Ubuntu distribution Enabled.
+- Go to the project in the WSL terminal and run `./start.sh`.
 
-2. WSL içine Native Docker Kurmak (Docker Desktop olmadan):
+2. Installing Native Docker in WSL (without Docker Desktop):
 
-> Not: WSL’de systemd aktif değilse Docker servisini yönetmek zorlaşır. En güncel WSL’de systemd açılabiliyor.
+> Note: If systemd is not active in WSL, managing the Docker service becomes harder. In the latest WSL, systemd can be enabled.
 
-### Systemd açma (önerilir)
+### Enabling systemd (recommended)
 
-WSL Ubuntu içinde `/etc/wsl.conf` dosyasını aşağıdaki gibi oluşturun/güncelleyin:
+Create/update `/etc/wsl.conf` in WSL Ubuntu as follows:
 
 ```
 [boot]
 systemd=true
 ```
 
-Ardından Windows’ta WSL’i yeniden başlatın:
+Then restart WSL in Windows:
 
 ```powershell
 wsl --shutdown
 ```
 
-WSL’i tekrar açın ve aşağıdaki kurulumu yapın.
+Reopen WSL and perform the installation below.
 
-### Docker Engine kurulumu (resmi depo)
+### Installing Docker Engine (official repo)
 
 ```bash
 sudo apt-get update
@@ -53,63 +53,63 @@ sudo apt-get install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 echo \
-	"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-	$(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
-	sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Kullanıcıyı docker grubuna ekleyin
+# Add user to docker group
 sudo usermod -aG docker $USER
-# Grup üyeliğinin etkin olması için yeni shell açın
+# Open a new shell for group membership to take effect
 newgrp docker
 
-# Doğrulama
+# Verification
 docker --version
 docker compose version
 ```
 
-### Projeyi çalıştırma (WSL içinde)
+### Running the project (inside WSL)
 
 ```bash
 cd /mnt/c/Users/gocali/Desktop/syscommand
 ./start.sh
 ```
 
-Erişim:
+Access:
 
 - Frontend (Nginx): http://localhost:8080
 - Backend: http://localhost:2025/api/healthz
 - MQTT WS: ws://localhost:1453/mqtt
 
-Eğer Windows’tan `localhost` erişimi olmazsa (nadir), `docker-compose.yml` içindeki port yayınlarında `127.0.0.1:` kısmını kaldırıp sadece `8080:8080` şeklinde kullanın.
+If you cannot access `localhost` from Windows (rare), remove `127.0.0.1:` from port publishing in `docker-compose.yml` and use just `8080:8080`.
 
-## Mimari
+            ## Architecture
 
-Agent → MQTT → Backend (Redis’e yazar, REST sunar) → Nginx → Frontend
+            Agent → MQTT → Backend (writes to Redis, serves REST) → Nginx → Frontend
 
-## Windows/WSL’de CPU ve RAM farkı neden olabilir?
+            ## Why might CPU and RAM differ on Windows/WSL?
 
-Bu proje Linux konteynerlerinde çalışır. Windows’ta Docker Desktop kullanıyorsanız, konteynerler WSL2 Linux VM’i içinde koşar. Dolayısıyla ajan (`agent`) metrikleri Linux tarafındaki kaynaklara göre ölçer. Windows Görev Yöneticisi (Task Manager) ise Windows host’un kaynaklarını gösterir; bu ikisi bire bir aynı değildir.
+            This project runs in Linux containers. If you use Docker Desktop on Windows, containers run inside the WSL2 Linux VM. Thus, the agent (`agent`) measures metrics according to resources on the Linux side. Windows Task Manager shows the host's resources; these are not exactly the same.
 
-Örnek farklar:
+            Example differences:
 
-- RAM: WSL2 VM’in RAM kullanımı, Windows toplam RAM’den farklı olabilir. Ajan varsayılan olarak Linux VM’in (konteynerin gördüğü) toplam RAM’ine göre yüzde hesaplar.
-- CPU: Linux tarafındaki CPU yüzdesi, Windows’un CPU hesaplamasından farklı normalize edilebilir.
+            - RAM: WSL2 VM's RAM usage may differ from Windows' total RAM. By default, the agent calculates percentages based on the total RAM seen by the Linux VM (container).
+            - CPU: CPU percentage on the Linux side may be normalized differently than Windows.
 
-Yaklaşımlar:
+            Approaches:
 
-- Mevcut yapılandırmada `agent` servisi `pid: host` ile çalıştırılır; böylece WSL VM içindeki host PID ve bazı istatistiklere daha yakından erişerek daha gerçekçi metrik üretir.
-- Windows Task Manager ile bire bir karşılaştırmak istiyorsanız, ajanı doğrudan Windows üzerinde (Python ile) çalıştırmanız gerekir. Bunun için Docker yerine yerelde `python agent/agent.py` çalıştırıp `MQTT_HOST` olarak Docker’daki `mqtt` servisine erişen IP’yi/yönlendirmeyi ayarlayın.
+            - In the current configuration, the `agent` service runs with `pid: host`; thus, it can access host PID and some statistics inside the WSL VM for more realistic metrics.
+            - If you want to compare directly with Windows Task Manager, run the agent directly on Windows (with Python). For this, run `python agent/agent.py` locally instead of Docker, and set `MQTT_HOST` to the IP/forwarding of the Docker `mqtt` service.
 
-## Komut Çalıştırma
+            ## Command Execution
 
-Frontend’ten seçip gönderin. Agent yalnızca `ALLOWED` sözlüğündeki komutları çalıştırır (güvenlik). Yeni komut eklemek için `agent/agent.py` içinde `ALLOWED["isim"] = "shell"` ekleyin.
+            Select and send from the frontend. The agent only executes commands in the `ALLOWED` dictionary (for security). To add a new command, add `ALLOWED["name"] = "shell"` in `agent/agent.py`.
 
-### Agent içinde Docker komutları
+            ### Docker commands inside Agent
 
-`agent` imajı artık Docker CLI içerir (bkz. `agent/Dockerfile`). `docker ps` vb. komutların çalışabilmesi için:
+            The `agent` image now includes Docker CLI (see `agent/Dockerfile`). For commands like `docker ps` to work:
 
-- Host Docker daemon erişimi gerekir. Bunun için compose dosyasında `/var/run/docker.sock` bind mount yapılmıştır.
-- Güvenlik uyarısı: Docker socket paylaşımı konteynerin host üzerinde güçlü yetkiler almasına yol açar. Sadece güvenilir ortamlarda kullanın.
+            - Host Docker daemon access is required. For this, `/var/run/docker.sock` is bind-mounted in the compose file.
+            - Security warning: Sharing the Docker socket gives the container strong privileges on the host. Use only in trusted environments.
