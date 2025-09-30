@@ -1,0 +1,82 @@
+networks:
+  sysbus:
+    driver: bridge
+
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mqtt
+    ports:
+      - "127.0.0.1:1657:1883"   # MQTT TCP
+      - "127.0.0.1:1453:9001"   # MQTT WebSocket
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks: [sysbus]
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "127.0.0.1:1999:6379"
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [sysbus]
+
+  backend:
+    build: ./backend
+    container_name: backend
+    environment:
+      - MQTT_HOST=mqtt
+      - MQTT_PORT=1883
+      - REDIS_CONN=redis:6379
+      - ASPNETCORE_URLS=http://+:8080
+    depends_on:
+      - mqtt
+      - redis
+    ports:
+      - "127.0.0.1:2025:8080"
+    networks: [sysbus]
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    expose:
+      - "80"
+    networks: [sysbus]
+
+  nginx:
+    image: nginx:alpine
+    container_name: reverse-proxy
+    depends_on:
+      - frontend
+      - backend
+      - mqtt
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks: [sysbus]
+
+  agent:
+    build: ./agent
+    container_name: agent
+    working_dir: /app
+    pid: "host"
+    environment:
+      - MQTT_HOST=mqtt
+      - MQTT_PORT=1883
+      # Host kullanıcı adı; yoksa agent içinden getpass/hostname fallback'leri devreye girer
+      - AGENT_NAME=${USER:-${USERNAME:-}}
+    volumes:
+      - ./agent:/app:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    init: true
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    depends_on:
+      - mqtt
+    networks: [sysbus]
